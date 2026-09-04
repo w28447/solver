@@ -116,6 +116,8 @@ body {
 }
 
 .share-panel {
+  top: 0;
+  z-index: 20;
   max-width: 960px;
   margin: 12px auto 0;
   width: 100%;
@@ -131,6 +133,7 @@ body {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .share-row label {
@@ -179,6 +182,12 @@ body {
   background: #1d2a36;
   color: #d5f1ff;
   border-color: #2d4d5d;
+}
+
+.btn-leave {
+  background: #2a1c1c;
+  color: #ffd3d3;
+  border-color: #5d2d2d;
 }
 
 .btn-reset {

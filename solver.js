@@ -35,7 +35,7 @@ function sanitizeRoomId(rawValue) {
     .replace(/[^a-z0-9_-]/g, "")
     .slice(0, 20);
 
-  return roomId || "party-001";
+  return roomId;
 }
 
 function readRoomIdFromUrl() {
@@ -291,6 +291,15 @@ function initializeRealtimeSync() {
   if (shareState.stateRef) shareState.stateRef.off("value");
   if (shareState.membersRef) shareState.membersRef.off("value");
   if (shareState.roomRef) shareState.roomRef.off("value");
+  shareState.roomRef = null;
+  shareState.stateRef = null;
+  shareState.membersRef = null;
+
+  if (!roomId) {
+    shareState.memberId = null;
+    updateShareStatus("ローカルモード: ルームIDが未設定");
+    return;
+  }
 
   const roomRef = shareState.db.ref(`gorodKroviRooms/${roomId}`);
   const stateRef = roomRef.child("state");
@@ -312,8 +321,39 @@ function initializeRealtimeSync() {
   setupRoomPresence(roomId);
 }
 
+function leaveCurrentRoom() {
+  if (shareState.memberId && shareState.membersRef) {
+    removeCurrentMember();
+  }
+
+  if (shareState.stateRef) shareState.stateRef.off("value");
+  if (shareState.membersRef) shareState.membersRef.off("value");
+  if (shareState.roomRef) shareState.roomRef.off("value");
+
+  shareState.roomId = "";
+  shareState.roomRef = null;
+  shareState.stateRef = null;
+  shareState.membersRef = null;
+  shareState.memberId = null;
+
+  const roomInput = document.getElementById("roomIdInput");
+  if (roomInput) roomInput.value = "";
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("room");
+  window.history.replaceState({}, "", url.toString());
+
+  updateShareStatus("ルームIDが未設定");
+}
+
 function setRoomId(nextRoomId) {
   const normalized = sanitizeRoomId(nextRoomId);
+
+  if (!normalized) {
+    leaveCurrentRoom();
+    return;
+  }
+
   shareState.roomId = normalized;
 
   if (shareState.memberId && shareState.membersRef) {
@@ -397,6 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const roomInput = document.getElementById("roomIdInput");
   const joinRoomBtn = document.getElementById("joinRoomBtn");
   const copyRoomBtn = document.getElementById("copyRoomBtn");
+  const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
   if (roomInput) {
     roomInput.value = readRoomIdFromUrl();
@@ -413,15 +454,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (copyRoomBtn) {
     copyRoomBtn.addEventListener("click", async () => {
+      const activeRoom = (roomInput && roomInput.value) ? sanitizeRoomId(roomInput.value) : readRoomIdFromUrl();
+      if (!activeRoom) {
+        updateShareStatus("ルームIDが未設定のため共有していません", true);
+        return;
+      }
+
       const url = new URL(window.location.href);
-      const activeRoom = (roomInput && roomInput.value) ? roomInput.value : readRoomIdFromUrl();
-      url.searchParams.set("room", sanitizeRoomId(activeRoom));
+      url.searchParams.set("room", activeRoom);
       try {
         await navigator.clipboard.writeText(url.toString());
         updateShareStatus("URLをコピーしました");
       } catch (error) {
         updateShareStatus("URLのコピーに失敗しました", true);
       }
+    });
+  }
+
+  if (leaveRoomBtn) {
+    leaveRoomBtn.addEventListener("click", () => {
+      leaveCurrentRoom();
     });
   }
 
