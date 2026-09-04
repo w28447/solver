@@ -117,8 +117,7 @@ body {
 }
 
 .share-panel {
-  top: env(safe-area-inset-top, 0px);
-  z-index: 20;
+  position: static;
   max-width: 960px;
   margin: 12px auto 0;
   width: 100%;

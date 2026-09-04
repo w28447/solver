@@ -343,7 +343,7 @@ function leaveCurrentRoom() {
   url.searchParams.delete("room");
   window.history.replaceState({}, "", url.toString());
 
-  updateShareStatus("ルームIDが未設定");
+  updateShareStatus("ローカルモード: ルームIDが未設定");
 }
 
 function setRoomId(nextRoomId) {
@@ -456,7 +456,7 @@ document.addEventListener("DOMContentLoaded", () => {
     copyRoomBtn.addEventListener("click", async () => {
       const activeRoom = (roomInput && roomInput.value) ? sanitizeRoomId(roomInput.value) : readRoomIdFromUrl();
       if (!activeRoom) {
-        updateShareStatus("ルームIDが未設定のため共有していません", true);
+        updateShareStatus("ローカルモード: ルームIDが未設定", true);
         return;
       }
 
