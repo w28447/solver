@@ -41,7 +41,7 @@ function sanitizeRoomId(rawValue) {
 function readRoomIdFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const candidate = params.get("room");
-  return candidate ? sanitizeRoomId(candidate) : "party-001";
+  return candidate ? sanitizeRoomId(candidate) : "";
 }
 
 function updateShareStatus(message, isError = false) {
