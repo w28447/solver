@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Gorod Krovi Solver</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="share-panel">
+  <div class="share-row">
+    <label for="roomIdInput">ルームID</label>
+    <input id="roomIdInput" type="text" maxlength="20" autocomplete="off" placeholder="例: party-001" />
+    <button class="btn btn-room" id="joinRoomBtn" type="button">適用</button>
+    <button class="btn btn-copy" id="copyRoomBtn" type="button">URLをコピー</button>
+  </div>
+  <div class="share-status" id="shareStatus">ローカルモード</div>
+</div>
+
+<div class="panel-grid">
+  <!-- 1. デパート -->
+  <div class="room-card" data-room="Dept">
+    <div class="room-header">
+      <span class="room-title">デパート</span>
+      <div class="status-toggle">
+        <button type="button" class="st-btn btn-g" data-room="Dept" data-type="green">G</button>
+        <button type="button" class="st-btn btn-ng" data-room="Dept" data-type="notgreen">B</button>
+        <button type="button" class="st-btn btn-p" data-room="Dept" data-type="password">P</button>
+      </div>
+    </div>
+    <div class="valves-container">
+      <div class="btn-group" data-room="Dept">
+        <button type="button" class="v-btn active" data-val="1">1</button>
+        <button type="button" class="v-btn" data-val="2">2</button>
+        <button type="button" class="v-btn" data-val="3">3</button>
+      </div>
+      <div class="prob-display" id="pr_Dept">1:33 2:33 3:33</div>
+    </div>
+  </div>
+
+  <!-- 2. ドラゴンコマンド -->
+  <div class="room-card" data-room="Drag">
+    <div class="room-header">
+      <span class="room-title">ドラゴンコマンド</span>
+      <div class="status-toggle">
+        <button type="button" class="st-btn btn-g" data-room="Drag" data-type="green">G</button>
+        <button type="button" class="st-btn btn-ng" data-room="Drag" data-type="notgreen">B</button>
+        <button type="button" class="st-btn btn-p" data-room="Drag" data-type="password">P</button>
+      </div>
+    </div>
+    <div class="valves-container">
+      <div class="btn-group" data-room="Drag">
+        <button type="button" class="v-btn active" data-val="1">1</button>
+        <button type="button" class="v-btn" data-val="2">2</button>
+        <button type="button" class="v-btn" data-val="3">3</button>
+      </div>
+      <div class="prob-display" id="pr_Drag">1:33 2:33 3:33</div>
+    </div>
+  </div>
+
+  <!-- 3. 武器庫 -->
+  <div class="room-card" data-room="Armo">
+    <div class="room-header">
+      <span class="room-title">武器庫</span>
+      <div class="status-toggle">
+        <button type="button" class="st-btn btn-g" data-room="Armo" data-type="green">G</button>
+        <button type="button" class="st-btn btn-ng" data-room="Armo" data-type="notgreen">B</button>
+        <button type="button" class="st-btn btn-p" data-room="Armo" data-type="password">P</button>
+      </div>
+    </div>
+    <div class="valves-container">
+      <div class="btn-group" data-room="Armo">
+        <button type="button" class="v-btn active" data-val="1">1</button>
+        <button type="button" class="v-btn" data-val="2">2</button>
+        <button type="button" class="v-btn" data-val="3">3</button>
+      </div>
+      <div class="prob-display" id="pr_Armo">1:33 2:33 3:33</div>
+    </div>
+  </div>
+
+  <!-- 4. 補給所 -->
+  <div class="room-card" data-room="Supp">
+    <div class="room-header">
+      <span class="room-title">補給所</span>
+      <div class="status-toggle">
+        <button type="button" class="st-btn btn-g" data-room="Supp" data-type="green">G</button>
+        <button type="button" class="st-btn btn-ng" data-room="Supp" data-type="notgreen">B</button>
+        <button type="button" class="st-btn btn-p" data-room="Supp" data-type="password">P</button>
+      </div>
+    </div>
+    <div class="valves-container">
+      <div class="btn-group" data-room="Supp">
+        <button type="button" class="v-btn active" data-val="1">1</button>
+        <button type="button" class="v-btn" data-val="2">2</button>
+        <button type="button" class="v-btn" data-val="3">3</button>
+      </div>
+      <div class="prob-display" id="pr_Supp">1:33 2:33 3:33</div>
+    </div>
+  </div>
+
+  <!-- 5. 診療所 -->
+  <div class="room-card" data-room="Infi">
+    <div class="room-header">
+      <span class="room-title">診療所</span>
+      <div class="status-toggle">
+        <button type="button" class="st-btn btn-g" data-room="Infi" data-type="green">G</button>
+        <button type="button" class="st-btn btn-ng" data-room="Infi" data-type="notgreen">B</button>
+        <button type="button" class="st-btn btn-p" data-room="Infi" data-type="password">P</button>
+      </div>
+    </div>
+    <div class="valves-container">
+      <div class="btn-group" data-room="Infi">
+        <button type="button" class="v-btn active" data-val="1">1</button>
+        <button type="button" class="v-btn" data-val="2">2</button>
+        <button type="button" class="v-btn" data-val="3">3</button>
+      </div>
+      <div class="prob-display" id="pr_Infi">1:33 2:33 3:33</div>
+    </div>
+  </div>
+
+  <!-- 6. 戦車工場 -->
+  <div class="room-card" data-room="Tank">
+    <div class="room-header">
+      <span class="room-title">戦車工場</span>
+      <div class="status-toggle">
+        <button type="button" class="st-btn btn-g" data-room="Tank" data-type="green">G</button>
+        <button type="button" class="st-btn btn-ng" data-room="Tank" data-type="notgreen">B</button>
+        <button type="button" class="st-btn btn-p" data-room="Tank" data-type="password">P</button>
+      </div>
+    </div>
+    <div class="valves-container">
+      <div class="btn-group" data-room="Tank">
+        <button type="button" class="v-btn active" data-val="1">1</button>
+        <button type="button" class="v-btn" data-val="2">2</button>
+        <button type="button" class="v-btn" data-val="3">3</button>
+      </div>
+      <div class="prob-display" id="pr_Tank">1:33 2:33 3:33</div>
+    </div>
+  </div>
+</div>
+
+<div class="control-actions">
+  <button class="btn btn-reset" id="resetBtn">リセット</button>
+</div>
+
+<div class="results-panel" id="resPanel">
+  <div class="table-scroll-wrapper">
+    <table>
+      <thead><tr><th>デパ</th><th>ドラ</th><th>武器</th><th>補給</th><th>診療</th><th>戦車</th></tr></thead>
+      <tbody id="resBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-database-compat.js"></script>
+<script>
+  window.GOROD_KROVI_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDo5BtxY6AE1cLsqJcML-AdijxLmtnrpn0",
+  authDomain: "solver-80ad0.firebaseapp.com",
+  databaseURL: "https://solver-80ad0-default-rtdb.firebaseio.com",
+  projectId: "solver-80ad0",
+  storageBucket: "solver-80ad0.firebasestorage.app",
+  messagingSenderId: "639285537821",
+  appId: "1:639285537821:web:399f1ab5f22f2ee64beaf4",
+  measurementId: "G-7GD00HE91K"
+};
+</script>
+<script src="solver.js"></script>
+</body>
+</html>
