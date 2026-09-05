@@ -35,9 +35,7 @@ body {
 
 body.menu-open {
   overflow: hidden;
-  position: fixed;
-  inset: 0;
-  width: 100%;
+  position: static;
 }
 
 button,
