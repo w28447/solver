@@ -44,6 +44,74 @@ function readRoomIdFromUrl() {
   return candidate ? sanitizeRoomId(candidate) : "";
 }
 
+const ROOM_TITLE_KEY = "gorodKroviRoomTitles";
+const DEFAULT_ROOM_TITLES = {
+  Dept: "デパート",
+  Drag: "ドラゴンコマンド",
+  Armo: "武器庫",
+  Supp: "補給所",
+  Infi: "診療所",
+  Tank: "戦車工場"
+};
+
+function readCookie(name) {
+  const cookieString = document.cookie || "";
+  const match = cookieString.split("; ").find((entry) => entry.startsWith(`${name}=`));
+  if (!match) return "";
+  return decodeURIComponent(match.split("=").slice(1).join("="));
+}
+
+function getAreaTitleMap() {
+  const cookieValue = readCookie(ROOM_TITLE_KEY);
+  const storageValue = localStorage.getItem(ROOM_TITLE_KEY);
+  const raw = cookieValue || storageValue || JSON.stringify(DEFAULT_ROOM_TITLES);
+
+  try {
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_ROOM_TITLES, ...parsed };
+  } catch (error) {
+    return { ...DEFAULT_ROOM_TITLES };
+  }
+}
+
+function setAreaTitleMap(map) {
+  const json = JSON.stringify(map);
+  document.cookie = `${ROOM_TITLE_KEY}=${encodeURIComponent(json)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+  localStorage.setItem(ROOM_TITLE_KEY, json);
+}
+
+function resetAreaTitleMap() {
+  document.cookie = `${ROOM_TITLE_KEY}=; path=/; max-age=0; SameSite=Lax`;
+  localStorage.removeItem(ROOM_TITLE_KEY);
+  return { ...DEFAULT_ROOM_TITLES };
+}
+
+function getAreaShortLabel(title) {
+  const text = String(title || "").trim();
+  return text.slice(0, 2) || "デパ";
+}
+
+function applyRoomTitleLabels() {
+  const titles = getAreaTitleMap();
+  keys.forEach((roomKey) => {
+    const defaultLabel = DEFAULT_ROOM_TITLES[roomKey] || roomKey;
+    const label = titles[roomKey] || defaultLabel;
+    const node = document.querySelector(`.room-card[data-room="${roomKey}"] .room-title`);
+    if (node) node.textContent = label;
+    const input = document.getElementById(`title_${roomKey}`);
+    if (input) {
+      const isDefault = String(titles[roomKey] || "").trim() === "" || String(label || "") === String(defaultLabel || "");
+      input.value = isDefault ? "" : label;
+      input.placeholder = defaultLabel;
+    }
+
+    const resultsHeader = document.getElementById(`resultsHeader_${roomKey}`);
+    if (resultsHeader) {
+      resultsHeader.textContent = getAreaShortLabel(label);
+    }
+  });
+}
+
 function updateShareStatus(message, isError = false) {
   const statusNode = document.getElementById("shareStatus");
   if (!statusNode) return;
@@ -438,6 +506,25 @@ document.addEventListener("DOMContentLoaded", () => {
   const joinRoomBtn = document.getElementById("joinRoomBtn");
   const copyRoomBtn = document.getElementById("copyRoomBtn");
   const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+  const menuToggleBtn = document.getElementById("menuToggleBtn");
+  const menuCloseBtn = document.getElementById("menuCloseBtn");
+  const menuPanel = document.getElementById("menuPanel");
+  const areaTitleEditor = document.getElementById("areaTitleEditor");
+  const areaTitleActions = document.getElementById("areaTitleActions");
+  const showAreaTitleEditorBtn = document.getElementById("showAreaTitleEditorBtn");
+  const saveRoomTitleBtn = document.getElementById("saveRoomTitleBtn");
+  const resetRoomTitleBtn = document.getElementById("resetRoomTitleBtn");
+
+  function setAreaTitleEditorVisible(isVisible) {
+    if (areaTitleEditor) areaTitleEditor.classList.toggle("hidden", !isVisible);
+    if (areaTitleActions) areaTitleActions.classList.toggle("hidden", !isVisible);
+    if (showAreaTitleEditorBtn) {
+      showAreaTitleEditorBtn.hidden = isVisible;
+    }
+  }
+
+  setAreaTitleEditorVisible(false);
+  applyRoomTitleLabels();
 
   if (roomInput) {
     roomInput.value = readRoomIdFromUrl();
@@ -474,6 +561,84 @@ document.addEventListener("DOMContentLoaded", () => {
   if (leaveRoomBtn) {
     leaveRoomBtn.addEventListener("click", () => {
       leaveCurrentRoom();
+    });
+  }
+
+  if (menuToggleBtn && menuPanel) {
+    menuToggleBtn.addEventListener("click", () => {
+      const isOpen = menuPanel.classList.toggle("open");
+      menuPanel.setAttribute("aria-hidden", String(!isOpen));
+      document.body.classList.toggle("menu-open", isOpen);
+      if (!isOpen) {
+        setAreaTitleEditorVisible(false);
+      }
+    });
+  }
+
+  if (menuCloseBtn && menuPanel) {
+    menuCloseBtn.addEventListener("click", () => {
+      menuPanel.classList.remove("open");
+      menuPanel.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("menu-open");
+      setAreaTitleEditorVisible(false);
+    });
+  }
+
+  if (menuPanel) {
+    menuPanel.addEventListener("click", (event) => {
+      if (event.target === menuPanel) {
+        menuPanel.classList.remove("open");
+        menuPanel.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("menu-open");
+        setAreaTitleEditorVisible(false);
+      }
+    });
+  }
+
+  if (showAreaTitleEditorBtn) {
+    showAreaTitleEditorBtn.addEventListener("click", () => {
+      setAreaTitleEditorVisible(true);
+    });
+  }
+
+  if (saveRoomTitleBtn) {
+    saveRoomTitleBtn.addEventListener("click", () => {
+      const nextTitles = {};
+      keys.forEach((roomKey) => {
+        const input = document.getElementById(`title_${roomKey}`);
+        nextTitles[roomKey] = (input && input.value.trim()) || DEFAULT_ROOM_TITLES[roomKey];
+      });
+
+      setAreaTitleMap(nextTitles);
+      applyRoomTitleLabels();
+      setAreaTitleEditorVisible(false);
+      if (menuPanel) {
+        menuPanel.classList.remove("open");
+        menuPanel.setAttribute("aria-hidden", "true");
+      }
+      document.body.classList.remove("menu-open");
+      updateShareStatus("エリア名を保存しました");
+    });
+  }
+
+  if (resetRoomTitleBtn) {
+    resetRoomTitleBtn.addEventListener("click", () => {
+      const defaultTitles = resetAreaTitleMap();
+      keys.forEach((roomKey) => {
+        const input = document.getElementById(`title_${roomKey}`);
+        if (input) {
+          input.value = "";
+          input.placeholder = defaultTitles[roomKey];
+        }
+      });
+      applyRoomTitleLabels();
+      setAreaTitleEditorVisible(false);
+      if (menuPanel) {
+        menuPanel.classList.remove("open");
+        menuPanel.setAttribute("aria-hidden", "true");
+      }
+      document.body.classList.remove("menu-open");
+      updateShareStatus("エリア名を初期値に戻しました");
     });
   }
 

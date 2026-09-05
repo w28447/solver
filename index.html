@@ -8,13 +8,63 @@
 </head>
 <body>
 
+<header class="app-header" aria-label="ページヘッダー">
+  <div class="app-header-title">Gorod Krovi Solver</div>
+  <button class="menu-toggle" id="menuToggleBtn" type="button" aria-label="メニューを開く">☰</button>
+</header>
+
+<div class="menu-panel" id="menuPanel" aria-hidden="true">
+  <div class="menu-panel-inner">
+    <div class="menu-header">
+      <span>設定</span>
+      <button class="menu-close" id="menuCloseBtn" type="button" aria-label="メニューを閉じる">✕</button>
+    </div>
+
+    <div class="menu-rename-trigger">
+      <button class="btn btn-room" id="showAreaTitleEditorBtn" type="button">エリア名変更</button>
+    </div>
+
+    <div class="menu-title-list hidden" id="areaTitleEditor">
+      <div class="menu-title-item">
+        <label class="menu-label" for="title_Dept">デパート</label>
+        <input id="title_Dept" class="menu-title-input" type="text" maxlength="20" placeholder="デパート" />
+      </div>
+      <div class="menu-title-item">
+        <label class="menu-label" for="title_Drag">ドラゴンコマンド</label>
+        <input id="title_Drag" class="menu-title-input" type="text" maxlength="20" placeholder="ドラゴンコマンド" />
+      </div>
+      <div class="menu-title-item">
+        <label class="menu-label" for="title_Armo">武器庫</label>
+        <input id="title_Armo" class="menu-title-input" type="text" maxlength="20" placeholder="武器庫" />
+      </div>
+      <div class="menu-title-item">
+        <label class="menu-label" for="title_Supp">補給所</label>
+        <input id="title_Supp" class="menu-title-input" type="text" maxlength="20" placeholder="補給所" />
+      </div>
+      <div class="menu-title-item">
+        <label class="menu-label" for="title_Infi">診療所</label>
+        <input id="title_Infi" class="menu-title-input" type="text" maxlength="20" placeholder="診療所" />
+      </div>
+      <div class="menu-title-item">
+        <label class="menu-label" for="title_Tank">戦車工場</label>
+        <input id="title_Tank" class="menu-title-input" type="text" maxlength="20" placeholder="戦車工場" />
+      </div>
+    </div>
+
+    <div class="menu-actions hidden" id="areaTitleActions">
+      <button class="btn btn-room" id="saveRoomTitleBtn" type="button">保存</button>
+      <button class="btn btn-reset" id="resetRoomTitleBtn" type="button">初期値に戻す</button>
+    </div>
+  </div>
+</div>
+
 <div class="share-panel">
   <div class="share-row">
     <label for="roomIdInput">ルームID</label>
     <input id="roomIdInput" type="text" maxlength="20" autocomplete="off" placeholder="例: party-001" />
     <button class="btn btn-room" id="joinRoomBtn" type="button">適用</button>
     <button class="btn btn-copy" id="copyRoomBtn" type="button">URLをコピー</button>
-    <button class="btn btn-leave" id="leaveRoomBtn" type="button">ルームから退出</button>
+    <button class="btn btn-leave" id="leaveRoomBtn" type="button">退出</button>
   </div>
   <div class="share-status" id="shareStatus">ローカルモード</div>
 </div>
@@ -148,7 +198,16 @@
 <div class="results-panel" id="resPanel">
   <div class="table-scroll-wrapper">
     <table>
-      <thead><tr><th>デパ</th><th>ドラ</th><th>武器</th><th>補給</th><th>診療</th><th>戦車</th></tr></thead>
+      <thead>
+        <tr>
+          <th id="resultsHeader_Dept">デパ</th>
+          <th id="resultsHeader_Drag">ドラ</th>
+          <th id="resultsHeader_Armo">武器</th>
+          <th id="resultsHeader_Supp">補給</th>
+          <th id="resultsHeader_Infi">診療</th>
+          <th id="resultsHeader_Tank">戦車</th>
+        </tr>
+      </thead>
       <tbody id="resBody"></tbody>
     </table>
   </div>
