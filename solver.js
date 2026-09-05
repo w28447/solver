@@ -10,9 +10,23 @@ const network = {
 const keys = ["Dept", "Drag", "Armo", "Supp", "Infi", "Tank"];
 const roomBit = { "Dept": 1, "Drag": 2, "Armo": 4, "Supp": 8, "Infi": 16, "Tank": 32 };
 const roomNames = ["Dept", "Drag", "Armo", "Supp", "Infi", "Tank"];
+const roomTemplates = [
+  { key: "Dept", label: "デパート" },
+  { key: "Drag", label: "ドラゴンコマンド" },
+  { key: "Armo", label: "武器庫" },
+  { key: "Supp", label: "補給所" },
+  { key: "Infi", label: "診療所" },
+  { key: "Tank", label: "戦車工場" }
+];
 
-const selectedVals = { Dept: 1, Drag: 1, Armo: 1, Supp: 1, Infi: 1, Tank: 1 };
+const selectedVals = { Dept: null, Drag: null, Armo: null, Supp: null, Infi: null, Tank: null };
 let lastStates = { green: null, password: null, notGreens: new Set() };
+
+const ROOM_STATUS_TYPES = Object.freeze({
+  GREEN: "green",
+  NOT_GREEN: "notgreen",
+  PASSWORD: "password"
+});
 
 const shareState = {
   roomId: null,
@@ -21,7 +35,6 @@ const shareState = {
   stateRef: null,
   membersRef: null,
   memberId: null,
-  roomCreatedAt: null,
   hasRealtimeSync: false,
   isApplyingRemote: false
 };
@@ -42,6 +55,47 @@ function readRoomIdFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const candidate = params.get("room");
   return candidate ? sanitizeRoomId(candidate) : "";
+}
+
+function closeMenuPanel() {
+  const menuPanel = document.getElementById("menuPanel");
+  const menuToggleBtn = document.getElementById("menuToggleBtn");
+  if (!menuPanel) return;
+
+  menuPanel.classList.remove("open");
+  menuPanel.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("menu-open");
+  if (menuToggleBtn) {
+    menuToggleBtn.setAttribute("aria-expanded", "false");
+  }
+  setAreaTitleEditorVisible(false);
+}
+
+function setMenuOpen(isOpen) {
+  const menuPanel = document.getElementById("menuPanel");
+  const menuToggleBtn = document.getElementById("menuToggleBtn");
+  if (!menuPanel) return;
+
+  menuPanel.classList.toggle("open", isOpen);
+  menuPanel.setAttribute("aria-hidden", String(!isOpen));
+  document.body.classList.toggle("menu-open", isOpen);
+  if (menuToggleBtn) {
+    menuToggleBtn.setAttribute("aria-expanded", String(isOpen));
+  }
+
+  if (!isOpen) {
+    setAreaTitleEditorVisible(false);
+  }
+}
+
+function detachRoomSubscriptions() {
+  if (shareState.stateRef) shareState.stateRef.off("value");
+  if (shareState.membersRef) shareState.membersRef.off("value");
+  if (shareState.roomRef) shareState.roomRef.off("value");
+
+  shareState.roomRef = null;
+  shareState.stateRef = null;
+  shareState.membersRef = null;
 }
 
 const ROOM_TITLE_KEY = "gorodKroviRoomTitles";
@@ -91,6 +145,66 @@ function getAreaShortLabel(title) {
   return text.slice(0, 2) || "デパ";
 }
 
+function renderRoomGrid() {
+  const container = document.getElementById("roomGrid");
+  if (!container) return;
+
+  const titles = getAreaTitleMap();
+  container.innerHTML = roomTemplates.map(({ key, label }) => {
+    const title = titles[key] || label;
+    return `
+      <div class="room-card" data-room="${key}">
+        <div class="room-header">
+          <span class="room-title">${title}</span>
+          <div class="status-toggle">
+            <button type="button" class="status-btn" data-room="${key}" data-type="green">G</button>
+            <button type="button" class="status-btn" data-room="${key}" data-type="notgreen">B</button>
+            <button type="button" class="status-btn" data-room="${key}" data-type="password">P</button>
+          </div>
+        </div>
+        <div class="valves-container">
+          <div class="btn-group" data-room="${key}">
+            <button type="button" class="dial-btn" data-val="1">1</button>
+            <button type="button" class="dial-btn" data-val="2">2</button>
+            <button type="button" class="dial-btn" data-val="3">3</button>
+          </div>
+          <div class="prob-display" id="pr_${key}">1:33 2:33 3:33</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  document.querySelectorAll(".btn-group").forEach(group => {
+    const room = group.dataset.room;
+    group.querySelectorAll(".dial-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const clickedVal = Number(e.target.dataset.val);
+        const isSameSelection = selectedVals[room] === clickedVal;
+
+        group.querySelectorAll(".dial-btn").forEach(b => b.classList.remove("active"));
+
+        if (isSameSelection) {
+          selectedVals[room] = null;
+        } else {
+          selectedVals[room] = clickedVal;
+          e.target.classList.add("active");
+        }
+
+        calculate();
+        syncCurrentState();
+      });
+    });
+  });
+
+  document.querySelectorAll(".status-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      handleStateToggle(e.target);
+      calculate();
+      syncCurrentState();
+    });
+  });
+}
+
 function applyRoomTitleLabels() {
   const titles = getAreaTitleMap();
   keys.forEach((roomKey) => {
@@ -119,23 +233,35 @@ function updateShareStatus(message, isError = false) {
   statusNode.style.color = isError ? "#ff8a8a" : "#93c5fd";
 }
 
+function getStatusButton(room, type) {
+  if (!room || !type) return null;
+  return document.querySelector(`.status-btn[data-room="${room}"][data-type="${type}"]`);
+}
+
 function syncToggleButtonsFromState() {
-  document.querySelectorAll(".st-btn").forEach(btn => {
+  document.querySelectorAll(".status-btn").forEach((btn) => {
     const room = btn.dataset.room;
     const type = btn.dataset.type;
     const isActive =
-      (type === "green" && lastStates.green === room) ||
-      (type === "password" && lastStates.password === room) ||
-      (type === "notgreen" && lastStates.notGreens.has(room));
+      (type === ROOM_STATUS_TYPES.GREEN && lastStates.green === room) ||
+      (type === ROOM_STATUS_TYPES.PASSWORD && lastStates.password === room) ||
+      (type === ROOM_STATUS_TYPES.NOT_GREEN && lastStates.notGreens.has(room));
     btn.classList.toggle("active", isActive);
   });
+}
+
+function clearStatusButtonState(room, type) {
+  const button = getStatusButton(room, type);
+  if (button) {
+    button.classList.remove("active");
+  }
 }
 
 function applySelectedValuesToButtons() {
   Object.entries(selectedVals).forEach(([room, value]) => {
     const group = document.querySelector(`.btn-group[data-room="${room}"]`);
     if (!group) return;
-    group.querySelectorAll(".v-btn").forEach(btn => {
+    group.querySelectorAll(".dial-btn").forEach(btn => {
       const isActive = Number(btn.dataset.val) === Number(value);
       btn.classList.toggle("active", isActive);
     });
@@ -200,7 +326,7 @@ function makeMemberId() {
 
 function resetStateToDefault({ sync = true } = {}) {
   keys.forEach(k => {
-    selectedVals[k] = 1;
+    selectedVals[k] = null;
   });
   lastStates = { green: null, password: null, notGreens: new Set() };
   applySelectedValuesToButtons();
@@ -211,17 +337,6 @@ function resetStateToDefault({ sync = true } = {}) {
   }
 }
 
-function getStoredRoomCreatedAt(roomId) {
-  const key = `gorodKroviCreatedAt:${roomId}`;
-  const value = Number(sessionStorage.getItem(key) || "0");
-  return Number.isFinite(value) ? value : 0;
-}
-
-function setStoredRoomCreatedAt(roomId, createdAt) {
-  if (!createdAt) return;
-  sessionStorage.setItem(`gorodKroviCreatedAt:${roomId}`, String(createdAt));
-}
-
 function syncRoomCreatedAt(roomRef, roomId) {
   if (!roomRef || !roomId) return;
 
@@ -230,15 +345,8 @@ function syncRoomCreatedAt(roomRef, roomId) {
     const existingCreatedAt = Number(roomData.createdAt || 0);
 
     if (!existingCreatedAt) {
-      const createdAt = Date.now();
-      roomRef.child("createdAt").set(createdAt);
-      shareState.roomCreatedAt = createdAt;
-      setStoredRoomCreatedAt(roomId, createdAt);
-      return;
+      roomRef.child("createdAt").set(Date.now());
     }
-
-    shareState.roomCreatedAt = existingCreatedAt;
-    setStoredRoomCreatedAt(roomId, existingCreatedAt);
   }).catch(() => {});
 }
 
@@ -336,7 +444,7 @@ function initializeRealtimeSync() {
     shareState.stateRef = null;
     shareState.membersRef = null;
     shareState.memberId = null;
-    updateShareStatus("ローカルモード: Firebaseの設定が未設定です");
+    updateShareStatus("ローカルモード: サーバーの設定が未設定です");
     return;
   }
 
@@ -356,12 +464,7 @@ function initializeRealtimeSync() {
   const roomId = shareState.roomId || readRoomIdFromUrl();
   shareState.roomId = roomId;
 
-  if (shareState.stateRef) shareState.stateRef.off("value");
-  if (shareState.membersRef) shareState.membersRef.off("value");
-  if (shareState.roomRef) shareState.roomRef.off("value");
-  shareState.roomRef = null;
-  shareState.stateRef = null;
-  shareState.membersRef = null;
+  detachRoomSubscriptions();
 
   if (!roomId) {
     shareState.memberId = null;
@@ -394,14 +497,9 @@ function leaveCurrentRoom() {
     removeCurrentMember();
   }
 
-  if (shareState.stateRef) shareState.stateRef.off("value");
-  if (shareState.membersRef) shareState.membersRef.off("value");
-  if (shareState.roomRef) shareState.roomRef.off("value");
+  detachRoomSubscriptions();
 
   shareState.roomId = "";
-  shareState.roomRef = null;
-  shareState.stateRef = null;
-  shareState.membersRef = null;
   shareState.memberId = null;
 
   const roomInput = document.getElementById("roomIdInput");
@@ -523,8 +621,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  renderRoomGrid();
   setAreaTitleEditorVisible(false);
   applyRoomTitleLabels();
+  document.querySelectorAll(".dial-btn").forEach((btn) => btn.classList.remove("active"));
 
   if (roomInput) {
     roomInput.value = readRoomIdFromUrl();
@@ -564,33 +664,23 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (menuToggleBtn && menuPanel) {
+  if (menuToggleBtn) {
     menuToggleBtn.addEventListener("click", () => {
-      const isOpen = menuPanel.classList.toggle("open");
-      menuPanel.setAttribute("aria-hidden", String(!isOpen));
-      document.body.classList.toggle("menu-open", isOpen);
-      if (!isOpen) {
-        setAreaTitleEditorVisible(false);
-      }
+      const isOpen = !menuPanel || !menuPanel.classList.contains("open");
+      setMenuOpen(isOpen);
     });
   }
 
-  if (menuCloseBtn && menuPanel) {
+  if (menuCloseBtn) {
     menuCloseBtn.addEventListener("click", () => {
-      menuPanel.classList.remove("open");
-      menuPanel.setAttribute("aria-hidden", "true");
-      document.body.classList.remove("menu-open");
-      setAreaTitleEditorVisible(false);
+      setMenuOpen(false);
     });
   }
 
   if (menuPanel) {
     menuPanel.addEventListener("click", (event) => {
       if (event.target === menuPanel) {
-        menuPanel.classList.remove("open");
-        menuPanel.setAttribute("aria-hidden", "true");
-        document.body.classList.remove("menu-open");
-        setAreaTitleEditorVisible(false);
+        setMenuOpen(false);
       }
     });
   }
@@ -612,11 +702,7 @@ document.addEventListener("DOMContentLoaded", () => {
       setAreaTitleMap(nextTitles);
       applyRoomTitleLabels();
       setAreaTitleEditorVisible(false);
-      if (menuPanel) {
-        menuPanel.classList.remove("open");
-        menuPanel.setAttribute("aria-hidden", "true");
-      }
-      document.body.classList.remove("menu-open");
+      setMenuOpen(false);
       updateShareStatus("エリア名を保存しました");
     });
   }
@@ -633,36 +719,10 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       applyRoomTitleLabels();
       setAreaTitleEditorVisible(false);
-      if (menuPanel) {
-        menuPanel.classList.remove("open");
-        menuPanel.setAttribute("aria-hidden", "true");
-      }
-      document.body.classList.remove("menu-open");
+      setMenuOpen(false);
       updateShareStatus("エリア名を初期値に戻しました");
     });
   }
-
-  document.querySelectorAll(".btn-group").forEach(group => {
-    const room = group.dataset.room;
-    group.querySelectorAll(".v-btn").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        group.querySelectorAll(".v-btn").forEach(b => b.classList.remove("active"));
-        e.target.classList.add("active");
-
-        selectedVals[room] = Number(e.target.dataset.val);
-        calculate();
-        syncCurrentState();
-      });
-    });
-  });
-
-  document.querySelectorAll(".st-btn").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      handleStateToggle(e.target);
-      calculate();
-      syncCurrentState();
-    });
-  });
 
   document.getElementById("resetBtn").addEventListener("click", reset);
 
@@ -681,53 +741,43 @@ function handleStateToggle(target) {
 
   if (isActive) {
     target.classList.remove("active");
-    if (type === "green") lastStates.green = null;
-    if (type === "password") lastStates.password = null;
-    if (type === "notgreen") lastStates.notGreens.delete(room);
-  } else {
-    if (type === "green") {
-      if (lastStates.green) {
-        const prevGreen = document.querySelector(`.st-btn[data-room="${lastStates.green}"][data-type="green"]`);
-        if (prevGreen) prevGreen.classList.remove("active");
-      }
-      lastStates.green = room;
-      lastStates.notGreens.delete(room);
-      const notGreenButton = document.querySelector(`.st-btn[data-room="${room}"][data-type="notgreen"]`);
-      if (notGreenButton) notGreenButton.classList.remove("active");
-      if (lastStates.password === room) {
-        lastStates.password = null;
-        const passwordButton = document.querySelector(`.st-btn[data-room="${room}"][data-type="password"]`);
-        if (passwordButton) passwordButton.classList.remove("active");
-      }
-    } else if (type === "password") {
-      if (lastStates.password) {
-        const prevPassword = document.querySelector(`.st-btn[data-room="${lastStates.password}"][data-type="password"]`);
-        if (prevPassword) prevPassword.classList.remove("active");
-      }
-      lastStates.password = room;
-      lastStates.notGreens.delete(room);
-      const notGreenButton = document.querySelector(`.st-btn[data-room="${room}"][data-type="notgreen"]`);
-      if (notGreenButton) notGreenButton.classList.remove("active");
-      if (lastStates.green === room) {
-        lastStates.green = null;
-        const greenButton = document.querySelector(`.st-btn[data-room="${room}"][data-type="green"]`);
-        if (greenButton) greenButton.classList.remove("active");
-      }
-    } else if (type === "notgreen") {
-      lastStates.notGreens.add(room);
-      if (lastStates.green === room) {
-        lastStates.green = null;
-        const greenButton = document.querySelector(`.st-btn[data-room="${room}"][data-type="green"]`);
-        if (greenButton) greenButton.classList.remove("active");
-      }
-      if (lastStates.password === room) {
-        lastStates.password = null;
-        const passwordButton = document.querySelector(`.st-btn[data-room="${room}"][data-type="password"]`);
-        if (passwordButton) passwordButton.classList.remove("active");
-      }
-    }
-    target.classList.add("active");
+    if (type === ROOM_STATUS_TYPES.GREEN) lastStates.green = null;
+    if (type === ROOM_STATUS_TYPES.PASSWORD) lastStates.password = null;
+    if (type === ROOM_STATUS_TYPES.NOT_GREEN) lastStates.notGreens.delete(room);
+    return;
   }
+
+  if (type === ROOM_STATUS_TYPES.GREEN) {
+    if (lastStates.green) clearStatusButtonState(lastStates.green, ROOM_STATUS_TYPES.GREEN);
+    lastStates.green = room;
+    lastStates.notGreens.delete(room);
+    clearStatusButtonState(room, ROOM_STATUS_TYPES.NOT_GREEN);
+    if (lastStates.password === room) {
+      lastStates.password = null;
+      clearStatusButtonState(room, ROOM_STATUS_TYPES.PASSWORD);
+    }
+  } else if (type === ROOM_STATUS_TYPES.PASSWORD) {
+    if (lastStates.password) clearStatusButtonState(lastStates.password, ROOM_STATUS_TYPES.PASSWORD);
+    lastStates.password = room;
+    lastStates.notGreens.delete(room);
+    clearStatusButtonState(room, ROOM_STATUS_TYPES.NOT_GREEN);
+    if (lastStates.green === room) {
+      lastStates.green = null;
+      clearStatusButtonState(room, ROOM_STATUS_TYPES.GREEN);
+    }
+  } else if (type === ROOM_STATUS_TYPES.NOT_GREEN) {
+    lastStates.notGreens.add(room);
+    if (lastStates.green === room) {
+      lastStates.green = null;
+      clearStatusButtonState(room, ROOM_STATUS_TYPES.GREEN);
+    }
+    if (lastStates.password === room) {
+      lastStates.password = null;
+      clearStatusButtonState(room, ROOM_STATUS_TYPES.PASSWORD);
+    }
+  }
+
+  target.classList.add("active");
 }
 
 function updateLiveProbabilities() {
@@ -830,11 +880,11 @@ function calculate() {
 }
 
 function reset() {
-  keys.forEach(k => {
-    selectedVals[k] = 1;
+  keys.forEach((roomKey) => {
+    selectedVals[roomKey] = null;
   });
   applySelectedValuesToButtons();
-  document.querySelectorAll(".st-btn").forEach(btn => btn.classList.remove("active"));
+  document.querySelectorAll(".status-btn").forEach((btn) => btn.classList.remove("active"));
   lastStates = { green: null, password: null, notGreens: new Set() };
   calculate();
   syncCurrentState();
